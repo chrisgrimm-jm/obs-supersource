@@ -139,7 +139,7 @@ async function analyzeScreenshot(imageBase64, mediaType) {
           text: 'This is a broadcast video layout (picture-in-picture / multi-box composition). ' +
             'Identify every distinct VIDEO CONTENT box as a rectangle — most prominent/background box first (zIndex 0), inset/PIP boxes on top with higher zIndex. ' +
             'Ignore decorative chrome: colored borders, bezels, divider lines, drop shadows, logos, and lower-third/scoreboard graphics that sit on top of or between the video boxes are NOT boxes themselves and should not be reported or included in a box\'s rectangle. ' +
-            'Each rectangle\'s edges should land on the actual video content boundary (where the camera/game footage starts), not on the outer edge of any border or divider around it — err toward the inside of a border rather than including it.',
+            'When a border or divider line sits between two video boxes, treat that line as the shared boundary and extend each box\'s edge to meet it, rather than stopping short and leaving a gap — a person will fine-tune exact pixel alignment afterward, so it is fine (better, even) to be slightly generous at a shared edge than to undershoot it.',
         },
       ],
     }],
