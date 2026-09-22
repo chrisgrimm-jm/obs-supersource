@@ -134,7 +134,13 @@ async function analyzeScreenshot(imageBase64, mediaType) {
       role: 'user',
       content: [
         { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-        { type: 'text', text: 'This is a broadcast video layout (picture-in-picture / multi-box composition). Identify every distinct video box as a rectangle, most prominent/background box first (zIndex 0), inset/PIP boxes on top with higher zIndex.' },
+        {
+          type: 'text',
+          text: 'This is a broadcast video layout (picture-in-picture / multi-box composition). ' +
+            'Identify every distinct VIDEO CONTENT box as a rectangle — most prominent/background box first (zIndex 0), inset/PIP boxes on top with higher zIndex. ' +
+            'Ignore decorative chrome: colored borders, bezels, divider lines, drop shadows, logos, and lower-third/scoreboard graphics that sit on top of or between the video boxes are NOT boxes themselves and should not be reported or included in a box\'s rectangle. ' +
+            'Each rectangle\'s edges should land on the actual video content boundary (where the camera/game footage starts), not on the outer edge of any border or divider around it — err toward the inside of a border rather than including it.',
+        },
       ],
     }],
   })
