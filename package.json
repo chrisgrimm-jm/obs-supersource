@@ -1,0 +1,29 @@
+{
+  "name": "obs-supersource",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "bin": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build:win": "pkg . --targets node18-win-x64 --output dist/obs-supersource.exe"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
+    "obs-websocket-js": "^5.0.8",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.22.0"
+  },
+  "pkg": {
+    "assets": [
+      "docs/**/*",
+      "presets.json"
+    ]
+  }
+}

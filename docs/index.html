@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>OBS SuperSource</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #1a1c20; color: #e8e8e8; }
+  header { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: #111318; border-bottom: 1px solid #2a2d34; flex-wrap: wrap; }
+  header h1 { font-size: 15px; font-weight: 600; margin: 0; margin-right: auto; color: #fff; }
+  header input, header select { background: #23262d; border: 1px solid #3a3e47; color: #eee; border-radius: 6px; padding: 6px 8px; font-size: 13px; }
+  header button { background: #3b6fe0; color: #fff; border: none; border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; }
+  header button:hover { background: #4a7cf0; }
+  #status { width: 10px; height: 10px; border-radius: 50%; background: #666; flex-shrink: 0; }
+  #status.ok { background: #3ecf5f; } #status.err { background: #e0503b; }
+  #error { color: #ff8a75; font-size: 12px; padding: 0 16px; min-height: 18px; }
+
+  main { display: flex; gap: 20px; padding: 16px; align-items: flex-start; flex-wrap: wrap; }
+  #stage-wrap { flex-shrink: 0; }
+  #stage {
+    position: relative; width: 640px; aspect-ratio: 16/9;
+    background: #000 repeating-conic-gradient(#181818 0% 25%, #101010 0% 50%) 50% / 20px 20px;
+    border: 1px solid #3a3e47; border-radius: 4px; overflow: hidden; user-select: none;
+  }
+  #stage.review-mode { background: #000; }
+  #stage img.reference { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+
+  .box {
+    position: absolute; border: 2px solid; border-radius: 3px;
+    display: flex; align-items: flex-start; justify-content: flex-start;
+    font-size: 11px; font-weight: 700; cursor: grab;
+  }
+  .box.suggestion { border-style: dashed; background: rgba(255,255,255,.04); }
+  .box.dragging { cursor: grabbing; }
+  .box .label { padding: 2px 5px; background: rgba(0,0,0,.6); border-radius: 0 0 4px 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .box.disabled { opacity: .35; }
+  .box .resize { position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px; border-radius: 3px; background: inherit; border: 2px solid #fff; cursor: nwse-resize; }
+  .crop-handle { position: absolute; }
+  .crop-handle.top, .crop-handle.bottom { left: 6px; right: 6px; height: 8px; cursor: ns-resize; }
+  .crop-handle.left, .crop-handle.right { top: 6px; bottom: 6px; width: 8px; cursor: ew-resize; }
+  .crop-handle.top { top: -4px; } .crop-handle.bottom { bottom: -4px; }
+  .crop-handle.left { left: -4px; } .crop-handle.right { right: -4px; }
+  .crop-handle:hover { background: rgba(255,255,255,.35); }
+
+  #panels { display: flex; flex-direction: column; gap: 10px; min-width: 320px; flex: 1; }
+  fieldset { border: 1px solid #2a2d34; border-radius: 8px; padding: 10px 12px; }
+  fieldset legend { font-size: 12px; font-weight: 700; padding: 0 6px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; flex-wrap: wrap; }
+  .row label { font-size: 12px; color: #aaa; width: 62px; flex-shrink: 0; }
+  .row input[type="number"] { width: 70px; }
+  .row select { flex: 1; min-width: 120px; }
+  input, select { background: #23262d; border: 1px solid #3a3e47; color: #eee; border-radius: 5px; padding: 5px 6px; font-size: 12px; }
+  input[type="checkbox"] { width: 15px; height: 15px; }
+  .crop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+  #preset-save, .primary-btn { background: #3b6fe0; color: #fff; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; }
+  .preset-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; background: #23262d; border-radius: 6px; padding: 5px 8px; }
+  .preset-row .name { flex: 1; font-size: 12px; }
+  .preset-row button { background: #33363d; color: #eee; border: 1px solid #444; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
+  .preset-row button.del { color: #ff8a75; }
+  .preset-url { font-size: 10px; color: #666; font-family: ui-monospace, monospace; user-select: all; margin: 2px 0 6px 2px; }
+
+  #dropzone { border: 2px dashed #3a3e47; border-radius: 8px; padding: 18px; text-align: center; font-size: 12px; color: #888; cursor: pointer; }
+  #dropzone.dragover { border-color: #3b6fe0; color: #ddd; background: rgba(59,111,224,.08); }
+  .suggestion-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; background: #23262d; border-radius: 6px; padding: 6px 8px; }
+  .suggestion-row .swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .suggestion-row .name { font-size: 12px; flex: 1; }
+  #review-actions { display: flex; gap: 8px; margin-top: 8px; }
+  #review-actions button.secondary { background: #33363d; color: #eee; border: 1px solid #444; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>OBS SuperSource</h1>
+  <div id="status"></div>
+  <input id="bridge" placeholder="localhost:8788" style="width:120px" />
+  <input id="obsUrl" placeholder="ws://localhost:4455" style="width:150px" />
+  <input id="obsPassword" placeholder="password" type="password" style="width:110px" />
+  <button id="connect">Connect</button>
+  <select id="sceneSelect"><option value="">— select scene —</option></select>
+</header>
+<div id="error"></div>
+
+<main>
+  <div id="stage-wrap">
+    <div id="stage"></div>
+    <div id="review-actions" hidden>
+      <button id="review-apply" class="primary-btn">Apply Layout</button>
+      <button id="review-cancel" class="secondary">Cancel</button>
+    </div>
+    <fieldset style="margin-top:10px">
+      <legend>Import from Screenshot</legend>
+      <div id="dropzone">Drop a reference screenshot here, or click to choose one</div>
+      <input id="fileInput" type="file" accept="image/*" hidden>
+    </fieldset>
+    <fieldset style="margin-top:10px">
+      <legend>Presets</legend>
+      <div class="row">
+        <input id="preset-name" placeholder="Show name" style="flex:1">
+        <button id="preset-save">Save</button>
+      </div>
+      <div id="preset-list"></div>
+    </fieldset>
+    <fieldset style="margin-top:10px">
+      <legend>Settings</legend>
+      <div class="row">
+        <label style="width:auto">Anthropic API key</label>
+        <input id="apiKey" type="password" placeholder="sk-ant-..." style="flex:1">
+        <button id="apiKeySave">Save</button>
+      </div>
+      <div id="apiKeyStatus" style="font-size:11px;color:#666"></div>
+    </fieldset>
+  </div>
+  <div id="panels"></div>
+</main>
+
+<script>
+const stage = document.getElementById('stage')
+const panelsEl = document.getElementById('panels')
+const statusEl = document.getElementById('status')
+const errorEl = document.getElementById('error')
+const bridgeEl = document.getElementById('bridge')
+const obsUrlEl = document.getElementById('obsUrl')
+const obsPasswordEl = document.getElementById('obsPassword')
+const sceneSelectEl = document.getElementById('sceneSelect')
+
+let canvasWidth = 1920, canvasHeight = 1080
+let items = [] // [{sceneItemId, sourceName, enabled, transform}]
+let dragging = null
+let reviewBoxes = null // set while reviewing a screenshot import
+
+bridgeEl.value = localStorage.getItem('bridgeAddr') || 'localhost:8788'
+obsUrlEl.value = localStorage.getItem('obsUrl') || 'ws://localhost:4455'
+
+let ws
+function connectBridge(addr) {
+  ws = new WebSocket(`ws://${addr}`)
+  ws.onopen = () => { if (obsUrlEl.value) send({ type: 'connect', url: obsUrlEl.value, password: obsPasswordEl.value }) }
+  ws.onerror = () => { errorEl.textContent = `Can't reach bridge server at ${addr} — is "node server.js" running there?` }
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data)
+    if (msg.type === 'connected') { statusEl.className = 'ok'; errorEl.textContent = '' }
+    else if (msg.type === 'disconnected') { statusEl.className = 'err' }
+    else if (msg.type === 'error') { errorEl.textContent = msg.message }
+    else if (msg.type === 'scenes') renderSceneOptions(msg.scenes)
+    else if (msg.type === 'sceneState') {
+      canvasWidth = msg.canvasWidth; canvasHeight = msg.canvasHeight
+      items = msg.items
+      sceneSelectEl.value = msg.sceneName
+      renderAll()
+    }
+    else if (msg.type === 'presets') renderPresets(msg.presets)
+    else if (msg.type === 'hasApiKey') {
+      document.getElementById('apiKeyStatus').textContent = msg.hasApiKey ? 'A key is saved on the bridge.' : 'No key saved yet.'
+    }
+  }
+}
+connectBridge(bridgeEl.value)
+
+function send(msg) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)) }
+
+document.getElementById('connect').onclick = () => {
+  localStorage.setItem('bridgeAddr', bridgeEl.value)
+  localStorage.setItem('obsUrl', obsUrlEl.value)
+  if (ws.url !== `ws://${bridgeEl.value}`) connectBridge(bridgeEl.value)
+  else send({ type: 'connect', url: obsUrlEl.value, password: obsPasswordEl.value })
+}
+
+sceneSelectEl.onchange = () => send({ type: 'selectScene', sceneName: sceneSelectEl.value })
+
+function renderSceneOptions(scenes) {
+  const cur = sceneSelectEl.value
+  sceneSelectEl.innerHTML = '<option value="">— select scene —</option>' + scenes.map((s) => `<option value="${s}">${s}</option>`).join('')
+  if (scenes.includes(cur)) sceneSelectEl.value = cur
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
+const px2canvasX = (px) => (px / stage.clientWidth) * canvasWidth
+const px2canvasY = (px) => (px / stage.clientHeight) * canvasHeight
+
+// ---- render real scene items as boxes ----
+function renderAll() {
+  if (reviewBoxes) return // don't clobber the review overlay
+  stage.querySelectorAll('.box').forEach((el) => el.remove())
+  panelsEl.innerHTML = ''
+  items.forEach((item, idx) => {
+    const el = makeBoxEl(`item-${item.sceneItemId}`, item.sourceName, false)
+    el.style.borderColor = colorFor(idx)
+    stage.appendChild(el)
+    positionBoxEl(el, transformToRect(item.transform))
+    el.classList.toggle('disabled', !item.enabled)
+    wireBoxDrag(el, item)
+    panelsEl.appendChild(makePanel(item))
+  })
+}
+
+function transformToRect(t) {
+  return {
+    x: t.positionX || 0, y: t.positionY || 0,
+    w: t.width || 100, h: t.height || 100,
+    cropLeft: t.cropLeft || 0, cropTop: t.cropTop || 0, cropRight: t.cropRight || 0, cropBottom: t.cropBottom || 0,
+    sourceWidth: t.sourceWidth || 1920, sourceHeight: t.sourceHeight || 1080,
+  }
+}
+
+function makeBoxEl(id, label, isSuggestion) {
+  const el = document.createElement('div')
+  el.className = 'box' + (isSuggestion ? ' suggestion' : '')
+  el.id = id
+  el.innerHTML = `
+    <span class="label">${label}</span>
+    <div class="resize"></div>
+    ${isSuggestion ? '' : `
+      <div class="crop-handle top" data-crop="top"></div>
+      <div class="crop-handle bottom" data-crop="bottom"></div>
+      <div class="crop-handle left" data-crop="left"></div>
+      <div class="crop-handle right" data-crop="right"></div>
+    `}
+  `
+  return el
+}
+
+function positionBoxEl(el, rect) {
+  const w = (rect.w / canvasWidth) * stage.clientWidth
+  const h = (rect.h / canvasHeight) * stage.clientHeight
+  const x = (rect.x / canvasWidth) * stage.clientWidth
+  const y = (rect.y / canvasHeight) * stage.clientHeight
+  el.style.width = `${w}px`; el.style.height = `${h}px`
+  el.style.left = `${x}px`; el.style.top = `${y}px`
+}
+
+const BOX_COLORS = ['#e0503b', '#3b9ee0', '#e0c33b', '#7fe03b', '#c33be0', '#3be0b0', '#e08a3b', '#3b5fe0']
+function colorFor(idx) { return BOX_COLORS[idx % BOX_COLORS.length] }
+
+function makePanel(item) {
+  const idx = items.indexOf(item)
+  const rect = transformToRect(item.transform)
+  const panel = document.createElement('fieldset')
+  panel.innerHTML = `
+    <legend style="color:${colorFor(idx)}">${item.sourceName}</legend>
+    <div class="row"><label><input type="checkbox" ${item.enabled ? 'checked' : ''} data-field="enabled"> Enabled</label></div>
+    <div class="row"><label>X</label><input type="number" value="${Math.round(rect.x)}" data-field="x">
+      <label>Y</label><input type="number" value="${Math.round(rect.y)}" data-field="y"></div>
+    <div class="row"><label>Width</label><input type="number" value="${Math.round(rect.w)}" data-field="w">
+      <label>Height</label><input type="number" value="${Math.round(rect.h)}" data-field="h"></div>
+    <div class="crop-grid">
+      <div class="row"><label>Crop T</label><input type="number" value="${rect.cropTop}" data-field="cropTop"></div>
+      <div class="row"><label>Crop B</label><input type="number" value="${rect.cropBottom}" data-field="cropBottom"></div>
+      <div class="row"><label>Crop L</label><input type="number" value="${rect.cropLeft}" data-field="cropLeft"></div>
+      <div class="row"><label>Crop R</label><input type="number" value="${rect.cropRight}" data-field="cropRight"></div>
+    </div>
+  `
+  panel.querySelectorAll('[data-field]').forEach((input) => {
+    input.onchange = () => {
+      const field = input.dataset.field
+      if (field === 'enabled') { send({ type: 'setItem', sceneItemId: item.sceneItemId, enabled: input.checked }); return }
+      const r = transformToRect(item.transform)
+      r[field] = Number(input.value)
+      applyBoxRect(item, r)
+    }
+  })
+  return panel
+}
+
+function applyBoxRect(item, r) {
+  const transform = {
+    positionX: r.x, positionY: r.y,
+    boundsType: 'OBS_BOUNDS_SCALE_INNER', boundsAlignment: 5,
+    boundsWidth: Math.max(1, r.w), boundsHeight: Math.max(1, r.h),
+    cropLeft: Math.round(r.cropLeft), cropTop: Math.round(r.cropTop),
+    cropRight: Math.round(r.cropRight), cropBottom: Math.round(r.cropBottom),
+  }
+  item.transform = { ...item.transform, ...transform, width: r.w, height: r.h }
+  send({ type: 'setItem', sceneItemId: item.sceneItemId, transform })
+}
+
+function wireBoxDrag(el, item) {
+  el.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('resize') || e.target.classList.contains('crop-handle')) return
+    startDrag(el, 'move', e, () => transformToRect(item.transform), (r) => applyBoxRect(item, r))
+  })
+  el.querySelector('.resize').addEventListener('mousedown', (e) => {
+    e.stopPropagation()
+    startDrag(el, 'resize', e, () => transformToRect(item.transform), (r) => applyBoxRect(item, r))
+  })
+  el.querySelectorAll('.crop-handle').forEach((handle) => {
+    handle.addEventListener('mousedown', (e) => {
+      e.stopPropagation()
+      startDrag(el, `crop-${handle.dataset.crop}`, e, () => transformToRect(item.transform), (r) => applyBoxRect(item, r))
+    })
+  })
+}
+
+function startDrag(el, mode, e, getRect, onChange) {
+  dragging = { el, mode, startX: e.clientX, startY: e.clientY, orig: getRect(), onChange }
+  el.classList.add('dragging')
+  window.addEventListener('mousemove', onDragMove)
+  window.addEventListener('mouseup', onDragEnd)
+  e.preventDefault()
+}
+
+function onDragMove(e) {
+  if (!dragging) return
+  const dxPx = e.clientX - dragging.startX
+  const dyPx = e.clientY - dragging.startY
+  const { mode, orig, el } = dragging
+  const dx = px2canvasX(dxPx), dy = px2canvasY(dyPx)
+  let r = { ...orig }
+  if (mode === 'move') {
+    r.x = clamp(Math.round(orig.x + dx), -orig.w, canvasWidth)
+    r.y = clamp(Math.round(orig.y + dy), -orig.h, canvasHeight)
+  } else if (mode === 'resize') {
+    r.w = clamp(Math.round(orig.w + dx), 20, canvasWidth * 2)
+    r.h = clamp(Math.round(orig.h + dy), 20, canvasHeight * 2)
+  } else if (mode.startsWith('crop-')) {
+    const side = mode.slice(5)
+    const scaleX = orig.sourceWidth / Math.max(1, orig.w)
+    const scaleY = orig.sourceHeight / Math.max(1, orig.h)
+    if (side === 'top') r.cropTop = clamp(Math.round(orig.cropTop + dy * scaleY), 0, orig.sourceHeight)
+    if (side === 'bottom') r.cropBottom = clamp(Math.round(orig.cropBottom - dy * scaleY), 0, orig.sourceHeight)
+    if (side === 'left') r.cropLeft = clamp(Math.round(orig.cropLeft + dx * scaleX), 0, orig.sourceWidth)
+    if (side === 'right') r.cropRight = clamp(Math.round(orig.cropRight - dx * scaleX), 0, orig.sourceWidth)
+  }
+  positionBoxEl(el, r)
+  dragging.pending = r
+}
+
+function onDragEnd() {
+  if (dragging) {
+    dragging.el.classList.remove('dragging')
+    if (dragging.pending) dragging.onChange(dragging.pending)
+  }
+  dragging = null
+  window.removeEventListener('mousemove', onDragMove)
+  window.removeEventListener('mouseup', onDragEnd)
+}
+
+// ---- presets ----
+document.getElementById('preset-save').onclick = () => {
+  const name = document.getElementById('preset-name').value.trim()
+  if (!name) return
+  send({ type: 'savePreset', name })
+  document.getElementById('preset-name').value = ''
+}
+function renderPresets(presets) {
+  const listEl = document.getElementById('preset-list')
+  const names = Object.keys(presets).sort()
+  const httpHost = bridgeEl.value || 'localhost:8788'
+  listEl.innerHTML = names.map((name) => `
+    <div class="preset-row">
+      <span class="name">${name}</span>
+      <button data-load="${name}">Load</button>
+      <button class="del" data-del="${name}">✕</button>
+    </div>
+    <div class="preset-url">http://${httpHost}/presets/${encodeURIComponent(name)}/load</div>
+  `).join('') || '<div class="row" style="color:#666">No presets yet</div>'
+  listEl.querySelectorAll('[data-load]').forEach((btn) => { btn.onclick = () => send({ type: 'loadPreset', name: btn.dataset.load }) })
+  listEl.querySelectorAll('[data-del]').forEach((btn) => { btn.onclick = () => { if (confirm(`Delete preset "${btn.dataset.del}"?`)) send({ type: 'deletePreset', name: btn.dataset.del }) } })
+}
+
+// ---- settings ----
+document.getElementById('apiKeySave').onclick = () => {
+  const key = document.getElementById('apiKey').value.trim()
+  if (!key) return
+  send({ type: 'setApiKey', key })
+  document.getElementById('apiKey').value = ''
+}
+
+// ---- screenshot import ----
+const dropzone = document.getElementById('dropzone')
+const fileInput = document.getElementById('fileInput')
+dropzone.onclick = () => fileInput.click()
+fileInput.onchange = () => { if (fileInput.files[0]) handleScreenshot(fileInput.files[0]) }
+;['dragenter', 'dragover'].forEach((evt) => dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('dragover') }))
+;['dragleave', 'drop'].forEach((evt) => dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove('dragover') }))
+dropzone.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]; if (f) handleScreenshot(f) })
+
+function handleScreenshot(file) {
+  const reader = new FileReader()
+  reader.onload = async () => {
+    const dataUrl = reader.result
+    const base64 = dataUrl.split(',')[1]
+    dropzone.textContent = 'Analyzing…'
+    try {
+      const res = await fetch(`http://${bridgeEl.value}/analyze-screenshot`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, mediaType: file.type || 'image/png' }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error)
+      enterReviewMode(dataUrl, data.boxes)
+    } catch (e) {
+      errorEl.textContent = `Screenshot analysis failed: ${e.message}`
+    } finally {
+      dropzone.textContent = 'Drop a reference screenshot here, or click to choose one'
+    }
+  }
+  reader.readAsDataURL(file)
+}
+
+function enterReviewMode(imageDataUrl, boxes) {
+  reviewBoxes = boxes.map((b, i) => ({ ...b, id: `sugg-${i}`, assignedSource: '' }))
+  stage.classList.add('review-mode')
+  stage.querySelectorAll('.box, img.reference').forEach((el) => el.remove())
+  panelsEl.innerHTML = ''
+  document.getElementById('review-actions').hidden = false
+
+  const img = document.createElement('img')
+  img.className = 'reference'
+  img.src = imageDataUrl
+  stage.appendChild(img)
+
+  reviewBoxes.sort((a, b) => a.zIndex - b.zIndex).forEach((b, idx) => {
+    const el = makeBoxEl(b.id, b.label, true)
+    el.style.borderColor = colorFor(idx)
+    stage.appendChild(el)
+    positionBoxEl(el, { x: b.xPct * canvasWidth, y: b.yPct * canvasHeight, w: b.widthPct * canvasWidth, h: b.heightPct * canvasHeight })
+    wireSuggestionDrag(el, b)
+    panelsEl.appendChild(makeSuggestionPanel(b, idx))
+  })
+}
+
+function wireSuggestionDrag(el, b) {
+  const getRect = () => ({ x: b.xPct * canvasWidth, y: b.yPct * canvasHeight, w: b.widthPct * canvasWidth, h: b.heightPct * canvasHeight })
+  const onChange = (r) => { b.xPct = r.x / canvasWidth; b.yPct = r.y / canvasHeight; b.widthPct = r.w / canvasWidth; b.heightPct = r.h / canvasHeight }
+  el.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('resize')) return
+    startDrag(el, 'move', e, getRect, onChange)
+  })
+  el.querySelector('.resize').addEventListener('mousedown', (e) => {
+    e.stopPropagation()
+    startDrag(el, 'resize', e, getRect, onChange)
+  })
+}
+
+function makeSuggestionPanel(b, idx) {
+  const panel = document.createElement('fieldset')
+  const opts = items.map((it) => `<option value="${it.sourceName}">${it.sourceName}</option>`).join('')
+  panel.innerHTML = `
+    <legend style="color:${colorFor(idx)}">${b.label}</legend>
+    <div class="row"><label>Source</label><select data-assign><option value="">— skip —</option>${opts}</select></div>
+  `
+  panel.querySelector('[data-assign]').onchange = (e) => { b.assignedSource = e.target.value }
+  return panel
+}
+
+document.getElementById('review-cancel').onclick = exitReviewMode
+document.getElementById('review-apply').onclick = () => {
+  for (const b of reviewBoxes) {
+    if (!b.assignedSource) continue
+    const item = items.find((it) => it.sourceName === b.assignedSource)
+    if (!item) continue
+    const r = { x: b.xPct * canvasWidth, y: b.yPct * canvasHeight, w: b.widthPct * canvasWidth, h: b.heightPct * canvasHeight, cropLeft: 0, cropTop: 0, cropRight: 0, cropBottom: 0 }
+    applyBoxRect(item, r)
+    send({ type: 'setItem', sceneItemId: item.sceneItemId, enabled: true })
+  }
+  exitReviewMode()
+}
+
+function exitReviewMode() {
+  reviewBoxes = null
+  stage.classList.remove('review-mode')
+  document.getElementById('review-actions').hidden = true
+  renderAll()
+}
+</script>
+</body>
+</html>
